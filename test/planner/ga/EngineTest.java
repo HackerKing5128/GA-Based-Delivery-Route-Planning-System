@@ -30,11 +30,18 @@ public final class EngineTest {
         rejects(() -> new DistanceMatrix(List.of(depot)));
         rejects(() -> new DistanceMatrix(List.of(depot, depot)));
         rejects(() -> new Location("X", Double.NaN, 0));
+        rejects(() -> new Settings(5, -1, 1, 1, 2, 0));
+        rejects(() -> new Settings(5, 0, Double.NaN, 1, 2, 0));
+        rejects(() -> new Settings(5, 0, 0, 1, 6, 0));
+        rejects(() -> new Settings(5, 0, 0, 1, 2, 5));
+        var same = new DistanceMatrix(List.of(depot, new Location("Other", 1, 1)));
+        var zero = GeneticAlgorithm.optimize(same, new Settings(3, 3, 1, 1, 1, 0), 7);
+        check(zero.distance() == 0 && zero.order().equals(List.of(1)), "Coincident delivery");
         var first = List.of(1, 2, 3, 4, 5, 6);
         var second = List.of(4, 6, 5, 2, 1, 3);
         check(Operators.orderCrossover(first, second, 1, 3).equals(List.of(5, 2, 3, 4, 1, 6)), "OX wrap");
         var rng = new Random(123);
-
+        boolean finalImprovement = false;
         for (int n : List.of(5, 10, 20)) {
             var points = new ArrayList<Location>();
             points.add(depot);
@@ -52,7 +59,22 @@ public final class EngineTest {
                 int changed = 0;
                 for (int i = 0; i < n; i++) if (!beforeSwap.get(i).equals(child.get(i))) changed++;
                 check(changed == 2 && RouteValidator.isValid(child, n), "Swap permutation");
+
+                var settings = new Settings(9, 5, 1, 1, 3, seed % 2);
+                var result = GeneticAlgorithm.optimize(matrix, settings, seed);
+                check(result.equals(GeneticAlgorithm.optimize(matrix, settings, seed)), "Repeatable seed");
+                var history = result.bestByGeneration();
+                check(history.size() == 6 && result.distance() == matrix.cost(result.order())
+                        && history.get(5) == result.distance(), "Best evaluated tour");
+                for (int i = 1; i < history.size(); i++) {
+                    check(history.get(i) <= history.get(i - 1), "Best retained");
+                }
+                finalImprovement |= history.get(5) < history.get(4);
             }
         }
+        check(finalImprovement, "Covered an improving final generation");
+        var initialOnly = GeneticAlgorithm.optimize(triangle, new Settings(3, 0, 0, 0, 1, 0), 5);
+        check(initialOnly.bestByGeneration().equals(List.of(12.0)), "Generation zero");
+        System.out.println("Engine checks passed (geometry, validation, operators, seeded evolution).");
     }
 }
