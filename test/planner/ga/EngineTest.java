@@ -30,5 +30,29 @@ public final class EngineTest {
         rejects(() -> new DistanceMatrix(List.of(depot)));
         rejects(() -> new DistanceMatrix(List.of(depot, depot)));
         rejects(() -> new Location("X", Double.NaN, 0));
+        var first = List.of(1, 2, 3, 4, 5, 6);
+        var second = List.of(4, 6, 5, 2, 1, 3);
+        check(Operators.orderCrossover(first, second, 1, 3).equals(List.of(5, 2, 3, 4, 1, 6)), "OX wrap");
+        var rng = new Random(123);
+
+        for (int n : List.of(5, 10, 20)) {
+            var points = new ArrayList<Location>();
+            points.add(depot);
+            for (int i = 1; i <= n; i++) {
+                points.add(new Location("D" + i, rng.nextInt(100), rng.nextInt(100)));
+            }
+            var matrix = new DistanceMatrix(points);
+            for (int seed = 0; seed < 30; seed++) {
+                var parent = List.copyOf(Operators.shuffled(matrix.inputOrder(), rng));
+                check(RouteValidator.isValid(parent, n), "Initial permutation");
+                var child = Operators.crossover(parent, matrix.inputOrder(), rng);
+                check(RouteValidator.isValid(child, n), "Crossover permutation");
+                var beforeSwap = List.copyOf(child);
+                Operators.mutate(child, rng);
+                int changed = 0;
+                for (int i = 0; i < n; i++) if (!beforeSwap.get(i).equals(child.get(i))) changed++;
+                check(changed == 2 && RouteValidator.isValid(child, n), "Swap permutation");
+            }
+        }
     }
 }
